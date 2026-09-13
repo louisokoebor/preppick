@@ -66,7 +66,12 @@ All colours, spacing, radii and typography live in `lib/theme/`. Screens should
 reference the tokens (`AppColors`, `AppSpacing`, `AppRadius`, `AppTypography`)
 rather than hard-coding values.
 
-The design system uses **DM Sans**. The font files are not bundled yet, so
-`AppTypography.fontFamily` is `null` and the platform default is used. To adopt
-DM Sans, add the font assets to `pubspec.yaml` and set that one constant — no
-other font is substituted in the meantime.
+The design system uses **Manrope**. The font is bundled in `assets/fonts` at the
+three weights the type scale uses — 400 Regular, 500 Medium, 600 SemiBold — so it
+renders offline with no network fetch and no `google_fonts` dependency. The
+weights were instanced from the upstream Manrope variable font; `OFL.txt` in the
+same folder carries the SIL Open Font License it ships under.
+
+If a new text style needs a weight outside 400/500/600, add that static to
+`assets/fonts` and declare it in `pubspec.yaml` rather than letting the platform
+synthesise it.

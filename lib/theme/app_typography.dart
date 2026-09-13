@@ -4,15 +4,14 @@ import 'app_colors.dart';
 
 /// PrepPick typography tokens.
 ///
-/// The design system uses DM Sans. The font files are not bundled yet, so
-/// [fontFamily] is intentionally null and Flutter falls back to the platform
-/// default. Once the DM Sans assets are added to `pubspec.yaml`, set
-/// [fontFamily] to 'DM Sans' and every style below picks it up. No other font
-/// is substituted in the meantime.
+/// The design system uses Manrope. The font is bundled in `assets/fonts` at the
+/// three weights this scale uses (400 Regular, 500 Medium, 600 SemiBold), so it
+/// renders offline with no network fetch. Every style below reads [fontFamily];
+/// no other font is substituted.
 class AppTypography {
   const AppTypography._();
 
-  static const String? fontFamily = null;
+  static const String fontFamily = 'Manrope';
 
   static TextStyle _style({
     required double size,

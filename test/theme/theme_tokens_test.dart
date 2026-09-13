@@ -101,8 +101,45 @@ void main() {
       expect(AppTypography.labelLarge.fontWeight, FontWeight.w500);
     });
 
-    test('no font family is substituted until DM Sans is bundled', () {
-      expect(AppTypography.fontFamily, isNull);
+    test('every style uses the bundled Manrope family', () {
+      expect(AppTypography.fontFamily, 'Manrope');
+      for (final style in [
+        AppTypography.displayLarge,
+        AppTypography.headingH1,
+        AppTypography.headingH2,
+        AppTypography.headingH3,
+        AppTypography.titleLarge,
+        AppTypography.titleMedium,
+        AppTypography.bodyLarge,
+        AppTypography.bodyMedium,
+        AppTypography.bodySmall,
+        AppTypography.labelLarge,
+        AppTypography.labelMedium,
+        AppTypography.caption,
+      ]) {
+        expect(style.fontFamily, 'Manrope');
+      }
+    });
+
+    test('only weights bundled in pubspec are used', () {
+      // assets/fonts ships 400/500/600; anything else would render synthesised.
+      const bundled = [FontWeight.w400, FontWeight.w500, FontWeight.w600];
+      for (final style in [
+        AppTypography.displayLarge,
+        AppTypography.headingH1,
+        AppTypography.headingH2,
+        AppTypography.headingH3,
+        AppTypography.titleLarge,
+        AppTypography.titleMedium,
+        AppTypography.bodyLarge,
+        AppTypography.bodyMedium,
+        AppTypography.bodySmall,
+        AppTypography.labelLarge,
+        AppTypography.labelMedium,
+        AppTypography.caption,
+      ]) {
+        expect(bundled, contains(style.fontWeight));
+      }
     });
   });
 
@@ -113,6 +150,7 @@ void main() {
       expect(theme.colorScheme.primary, AppColors.actionPrimary);
       expect(theme.colorScheme.error, AppColors.stateError);
       expect(theme.textTheme.bodyMedium?.fontSize, 14);
+      expect(theme.textTheme.bodyMedium?.fontFamily, 'Manrope');
     });
 
     testWidgets('MaterialApp builds with AppTheme', (tester) async {
