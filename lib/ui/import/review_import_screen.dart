@@ -5,6 +5,7 @@ import '../../app/routes.dart';
 import '../../models/models.dart';
 import '../../providers/import_provider.dart';
 import '../../providers/meal_provider.dart';
+import '../../services/import_matching_service.dart';
 import '../../theme/app_icons.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_radius.dart';
@@ -44,6 +45,33 @@ class ReviewImportScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _interpretWithAi(BuildContext context) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final provider = context.read<ImportProvider>();
+    final mealProvider = context.read<MealProvider>();
+    final library = <ImportLibraryEntry>[];
+    for (final meal in mealProvider.meals) {
+      final family = mealProvider.familyOf(meal);
+      if (family == null) continue;
+      library.add(
+        ImportLibraryEntry(
+          id: meal.id,
+          familyId: meal.mealFamilyId,
+          familyName: family.name,
+          variantName: meal.name,
+          aliases: const [],
+        ),
+      );
+    }
+    final ok = await provider.interpretWithAi(library);
+    if (!context.mounted || !ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('AI suggestions are ready for your review.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ImportProvider>();
@@ -72,11 +100,19 @@ class ReviewImportScreen extends StatelessWidget {
                         AppSpacing.xl,
                         AppSpacing.xxl,
                       ),
-                      itemCount: provider.candidates.length,
+                      itemCount:
+                          provider.candidates.length +
+                          (provider.aiProposal == null ? 0 : 1),
                       separatorBuilder: (context, index) =>
                           const SizedBox(height: AppSpacing.md),
                       itemBuilder: (context, index) {
-                        final candidate = provider.candidates[index];
+                        if (provider.aiProposal != null && index == 0) {
+                          return _AiReviewSummary(provider: provider);
+                        }
+                        final candidate =
+                            provider.candidates[provider.aiProposal == null
+                                ? index
+                                : index - 1];
                         return _CandidateCard(candidate: candidate);
                       },
                     )
@@ -130,6 +166,20 @@ class ReviewImportScreen extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(height: AppSpacing.md),
+                  if (provider.supportsAiInterpretation) ...[
+                    PrepButton(
+                      key: const Key('interpretWithAiButton'),
+                      label: provider.aiProposal == null
+                          ? 'Interpret with AI'
+                          : 'Refresh AI suggestions',
+                      variant: PrepButtonVariant.secondary,
+                      isBusy: provider.isInterpretingAi,
+                      onPressed: provider.isInterpretingAi
+                          ? null
+                          : () => _interpretWithAi(context),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
                   PrepButton(
                     label: 'Confirm import',
                     icon: AppIcons.checkRounded,
@@ -240,7 +290,12 @@ class _CandidateCard extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             ),
-            if (candidate.isDuplicate || candidate.isAmbiguous || isDisabled)
+            if (candidate.isDuplicate ||
+                candidate.isAmbiguous ||
+                candidate.confidenceBand != null ||
+                candidate.matchedExistingId != null ||
+                candidate.reviewNote != null ||
+                isDisabled)
               Padding(
                 padding: const EdgeInsets.only(top: AppSpacing.sm),
                 child: Wrap(
@@ -257,6 +312,17 @@ class _CandidateCard extends StatelessWidget {
                         label: 'Needs review',
                         icon: AppIcons.infoOutlineRounded,
                       ),
+                    if (candidate.confidenceBand != null)
+                      _ReviewFlag(
+                        label:
+                            'AI confidence: ${candidate.confidenceBand!.value}',
+                        icon: AppIcons.autoAwesome,
+                      ),
+                    if (candidate.matchedExistingId != null)
+                      const _ReviewFlag(
+                        label: 'Existing match suggested',
+                        icon: AppIcons.syncRounded,
+                      ),
                     if (isDisabled)
                       const _ReviewFlag(
                         label: 'Imported',
@@ -265,6 +331,16 @@ class _CandidateCard extends StatelessWidget {
                   ],
                 ),
               ),
+            if (candidate.reviewNote != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                candidate.reviewNote!,
+                key: Key('candidateReviewNote-${candidate.id}'),
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -288,6 +364,54 @@ class _CandidateCard extends StatelessWidget {
       borderSide: const BorderSide(color: AppColors.actionPrimary),
     ),
   );
+}
+
+class _AiReviewSummary extends StatelessWidget {
+  const _AiReviewSummary({required this.provider});
+
+  final ImportProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final exactMatches = provider.aiMatches
+        .where(
+          (match) =>
+              match.kind == ImportMatchKind.exactVariant ||
+              match.kind == ImportMatchKind.exactAlias,
+        )
+        .length;
+    final unresolved = provider.aiProposal?.unresolved.length ?? 0;
+    return Container(
+      key: const Key('aiReviewSummary'),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.actionSecondary,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('AI suggestions ready', style: AppTypography.titleMedium),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Review every suggestion before confirming. AI never writes meals directly.',
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '${provider.aiMatches.length} suggestions'
+            '${exactMatches == 0 ? '' : ' · $exactMatches possible existing matches'}'
+            '${unresolved == 0 ? '' : ' · $unresolved unresolved'}',
+            style: AppTypography.labelMedium.copyWith(
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ReviewFlag extends StatelessWidget {

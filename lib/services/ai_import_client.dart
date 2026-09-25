@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../models/models.dart';
+import '../utils/error_messages.dart';
 
 class ImportHttpResponse {
   const ImportHttpResponse({required this.statusCode, required this.body});
@@ -46,7 +47,7 @@ class IoImportHttpTransport implements ImportHttpTransport {
   }
 }
 
-class AiImportException implements Exception {
+class AiImportException implements PrepUserFacingException {
   const AiImportException({
     required this.code,
     required this.userMessage,
@@ -54,6 +55,7 @@ class AiImportException implements Exception {
   });
 
   final String code;
+  @override
   final String userMessage;
   final int? statusCode;
 

@@ -226,7 +226,9 @@ class ImportService {
       'import_candidates',
       {
         'proposal_json': jsonEncode(_candidateProposal(candidate)),
-        'status': ImportCandidateStatus.edited.value,
+        'status': candidate.status == ImportCandidateStatus.proposed
+            ? ImportCandidateStatus.edited.value
+            : candidate.status.value,
         'matched_existing_id': candidate.matchedExistingId,
         'confidence_band': candidate.confidenceBand?.value,
         'review_note': candidate.reviewNote,
