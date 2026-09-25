@@ -46,12 +46,6 @@ function requireKeys(
   }
 }
 
-function assertProposalTempId(value: string, label: string): void {
-  if (!/^(family|variant)_[A-Za-z0-9_-]+$/.test(value)) {
-    throw new ImportValidationError(`${label} must be a proposal-local temp_id`);
-  }
-}
-
 function assertSourceLineIds(
   value: unknown,
   label: string,
@@ -88,9 +82,8 @@ export function validateProposal(
   }
 
   const submittedIds = new Set(submittedSourceLineIds);
-  const familyIds = new Set<string>();
-  const variantIds = new Set<string>();
   const families: MealImportProposal["families"] = [];
+  let variantSequence = 0;
 
   for (let familyIndex = 0; familyIndex < root.families.length; familyIndex++) {
     const family = requireRecord(root.families[familyIndex], `families[${familyIndex}]`);
@@ -100,12 +93,11 @@ export function validateProposal(
       ["temp_id", "preferred_name", "aliases", "variants"],
       `families[${familyIndex}]`,
     );
-    const familyId = requireString(family.temp_id, `families[${familyIndex}].temp_id`);
-    assertProposalTempId(familyId, `families[${familyIndex}].temp_id`);
-    if (!familyId.startsWith("family_") || familyIds.has(familyId)) {
-      throw new ImportValidationError("Family temp_ids must be unique family_ references");
-    }
-    familyIds.add(familyId);
+    // The model's ID is only a hint. Assign stable, server-owned proposal IDs
+    // so a human-readable or malformed model ID cannot break an otherwise
+    // valid proposal or become a database identifier.
+    requireString(family.temp_id, `families[${familyIndex}].temp_id`);
+    const familyId = `family_${familyIndex + 1}`;
     const aliases = requireStringArray(family.aliases, `families[${familyIndex}].aliases`);
     if (!Array.isArray(family.variants)) {
       throw new ImportValidationError(`families[${familyIndex}].variants must be an array`);
@@ -140,12 +132,9 @@ export function validateProposal(
         ],
         label,
       );
-      const variantId = requireString(variant.temp_id, `${label}.temp_id`);
-      assertProposalTempId(variantId, `${label}.temp_id`);
-      if (!variantId.startsWith("variant_") || variantIds.has(variantId)) {
-        throw new ImportValidationError("Variant temp_ids must be unique variant_ references");
-      }
-      variantIds.add(variantId);
+      requireString(variant.temp_id, `${label}.temp_id`);
+      variantSequence += 1;
+      const variantId = `variant_${variantSequence}`;
       const mealSlot = variant.meal_slot;
       if (
         mealSlot !== null &&

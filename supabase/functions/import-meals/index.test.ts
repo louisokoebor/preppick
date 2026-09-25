@@ -23,3 +23,28 @@ Deno.test("unknown source IDs are rejected", () => {
     )
   );
 });
+
+Deno.test("model-generated temp IDs are replaced with server-local IDs", () => {
+  const proposal = validateProposal(
+    {
+      ...fixtures.valid.proposal,
+      families: [
+        {
+          ...fixtures.valid.proposal.families[0],
+          temp_id: "Lou Lou Spaghetti",
+          variants: [
+            {
+              ...fixtures.valid.proposal.families[0].variants[0],
+              temp_id: "Lou Lou Spaghetti with fish",
+            },
+          ],
+        },
+      ],
+      unresolved: [],
+    },
+    ["line_1", "line_2"],
+  );
+
+  assertEquals(proposal.families[0].temp_id, "family_1");
+  assertEquals(proposal.families[0].variants[0].temp_id, "variant_1");
+});
