@@ -8,6 +8,7 @@ import '../providers/settings_provider.dart';
 import '../providers/shopping_history_provider.dart';
 import '../providers/shopping_provider.dart';
 import '../services/database_service.dart';
+import '../services/ai_import_client.dart';
 import '../services/import_service.dart';
 import '../services/meal_service.dart';
 import '../services/planning_service.dart';
@@ -70,9 +71,11 @@ class _PrepPickAppState extends State<PrepPickApp> {
       widget.databaseService ?? DatabaseService();
   late final SettingsService _settingsService = SettingsService(_database);
   late final MealService _mealService = MealService(_database);
+  late final AiImportClient _aiImportClient = AiImportClient.fromEnvironment();
   late final ImportService _importService = ImportService(
     _mealService,
     _database,
+    _aiImportClient,
   );
   late final PlanningService _planningService = PlanningService(
     _database,

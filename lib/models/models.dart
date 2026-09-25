@@ -3,6 +3,8 @@ export 'ingredient.dart';
 export 'imported_meal_candidate.dart';
 export 'import_batch.dart';
 export 'import_candidate_source.dart';
+export 'import_library_entry.dart';
+export 'import_proposal.dart';
 export 'import_source_line.dart';
 export 'meal_family.dart';
 export 'meal_ingredient.dart';

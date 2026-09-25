@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../models/models.dart';
 import '../utils/id_utils.dart';
+import 'ai_import_client.dart';
 import 'database_service.dart';
 import 'import_line_classifier.dart';
 import 'meal_service.dart';
@@ -12,13 +13,37 @@ import 'meal_service.dart';
 /// extracts candidate names and writes confirmed meals to the library; it never
 /// creates ingredients, quantities or inferred meal types.
 class ImportService {
-  ImportService(this._mealService, [DatabaseService? databaseService])
-    : _databaseService = databaseService;
+  ImportService(
+    this._mealService, [
+    DatabaseService? databaseService,
+    AiImportClient? aiImportClient,
+  ]) : _databaseService = databaseService,
+       _aiImportClient = aiImportClient;
 
   final MealService _mealService;
   final DatabaseService? _databaseService;
+  final AiImportClient? _aiImportClient;
 
   bool get supportsStaging => _databaseService != null;
+  bool get supportsAiInterpretation => _aiImportClient?.isConfigured ?? false;
+
+  Future<ImportProposal> interpretWithAi({
+    required ImportParseResult parsed,
+    required List<ImportLibraryEntry> existingLibrary,
+  }) {
+    final client = _aiImportClient;
+    if (client == null || !client.isConfigured) {
+      throw const AiImportException(
+        code: 'not_configured',
+        userMessage: 'AI meal import is not configured on this build.',
+      );
+    }
+    return client.interpret(
+      sourceText: parsed.sourceText,
+      sourceLines: parsed.sourceLines,
+      existingLibrary: existingLibrary,
+    );
+  }
 
   static final RegExp _collapsedWhitespace = RegExp(r'\s+');
 
