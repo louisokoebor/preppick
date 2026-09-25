@@ -10,20 +10,21 @@ class AppTheme {
   const AppTheme._();
 
   static ThemeData get light {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.actionPrimary,
-      brightness: Brightness.light,
-    ).copyWith(
-      primary: AppColors.actionPrimary,
-      onPrimary: AppColors.textInverse,
-      secondary: AppColors.actionSecondary,
-      onSecondary: AppColors.textPrimary,
-      surface: AppColors.backgroundSurface,
-      onSurface: AppColors.textPrimary,
-      error: AppColors.stateError,
-      outline: AppColors.borderDefault,
-      outlineVariant: AppColors.borderSubtle,
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: AppColors.actionPrimary,
+          brightness: Brightness.light,
+        ).copyWith(
+          primary: AppColors.actionPrimary,
+          onPrimary: AppColors.textInverse,
+          secondary: AppColors.actionSecondary,
+          onSecondary: AppColors.textPrimary,
+          surface: AppColors.backgroundSurface,
+          onSurface: AppColors.textPrimary,
+          error: AppColors.stateError,
+          outline: AppColors.borderDefault,
+          outlineVariant: AppColors.borderSubtle,
+        );
 
     return ThemeData(
       useMaterial3: true,
@@ -56,22 +57,23 @@ class AppTheme {
           disabledBackgroundColor: AppColors.backgroundMuted,
           disabledForegroundColor: AppColors.textTertiary,
           elevation: 0,
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size.fromHeight(48),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xxl,
-            vertical: AppSpacing.md,
+            horizontal: AppSpacing.xl,
+            vertical: 14,
           ),
-          textStyle: AppTypography.titleMedium,
+          textStyle: AppTypography.labelLarge,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.full),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.backgroundSurface,
-        hintStyle: AppTypography.bodyMedium
-            .copyWith(color: AppColors.textTertiary),
+        hintStyle: AppTypography.bodyMedium.copyWith(
+          color: AppColors.textTertiary,
+        ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.lg,
           vertical: AppSpacing.md,
