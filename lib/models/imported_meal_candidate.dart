@@ -107,6 +107,7 @@ class ImportedMealCandidate {
     List<String>? sourceLineIds,
     ImportCandidateStatus? status,
     String? matchedExistingId,
+    bool clearMatchedExistingId = false,
     ImportConfidenceBand? confidenceBand,
     String? reviewNote,
   }) {
@@ -124,7 +125,9 @@ class ImportedMealCandidate {
       batchId: batchId ?? this.batchId,
       sourceLineIds: sourceLineIds ?? this.sourceLineIds,
       status: status ?? this.status,
-      matchedExistingId: matchedExistingId ?? this.matchedExistingId,
+      matchedExistingId: clearMatchedExistingId
+          ? null
+          : matchedExistingId ?? this.matchedExistingId,
       confidenceBand: confidenceBand ?? this.confidenceBand,
       reviewNote: reviewNote ?? this.reviewNote,
     );

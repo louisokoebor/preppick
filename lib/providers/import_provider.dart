@@ -182,6 +182,7 @@ class ImportProvider extends ChangeNotifier {
         candidate.id == id
             ? candidate.copyWith(
                 name: name.trim(),
+                clearMatchedExistingId: true,
                 status: candidate.isConfirmed
                     ? candidate.status
                     : ImportCandidateStatus.edited,
@@ -219,7 +220,13 @@ class ImportProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await _service.confirmCandidates(_candidates);
+      final result = _aiProposal == null
+          ? await _service.confirmCandidates(_candidates)
+          : await _service.confirmCandidatesWithProposal(
+              _candidates,
+              proposal: _aiProposal,
+              matches: _aiMatches,
+            );
       _candidates = result.candidates;
       _createdCount += result.createdCount;
       return result.createdCount;
@@ -313,6 +320,8 @@ class ImportProvider extends ChangeNotifier {
         'AI grouped this under ${entry.family.preferredName}.',
         if (entry.variant.mealSlot != null)
           'Suggested type: ${entry.variant.mealSlot}.',
+        if (entry.variant.componentNames.isNotEmpty)
+          'Components: ${entry.variant.componentNames.join(', ')}.',
         if (entry.variant.needsReviewReason != null)
           entry.variant.needsReviewReason!,
         if (match?.reason != null) match!.reason!,

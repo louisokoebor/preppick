@@ -78,6 +78,45 @@ class MealService {
     return rows.map(MealVariant.fromMap).toList();
   }
 
+  /// Returns the compact library index used by AI import matching, including
+  /// aliases captured from earlier reviewed imports.
+  Future<List<ImportLibraryEntry>> getImportLibraryEntries() async {
+    final db = await _db;
+    final rows = await db.rawQuery('''
+      SELECT v.id AS variant_id,
+             v.meal_family_id AS family_id,
+             v.name AS variant_name,
+             f.name AS family_name,
+             a.raw_label AS alias
+      FROM meal_variants v
+      JOIN meal_families f ON f.id = v.meal_family_id
+      LEFT JOIN meal_aliases a
+        ON a.variant_id = v.id OR a.family_id = f.id
+      WHERE v.archived_at IS NULL AND f.archived_at IS NULL
+      ORDER BY v.name COLLATE NOCASE
+    ''');
+    final aliasesByVariant = <String, List<String>>{};
+    final entriesByVariant = <String, ImportLibraryEntry>{};
+    for (final row in rows) {
+      final variantId = row['variant_id']! as String;
+      final aliases = aliasesByVariant.putIfAbsent(variantId, () => []);
+      final alias = row['alias'] as String?;
+      if (alias != null &&
+          alias.trim().isNotEmpty &&
+          !aliases.contains(alias)) {
+        aliases.add(alias);
+      }
+      entriesByVariant[variantId] = ImportLibraryEntry(
+        id: variantId,
+        familyId: row['family_id']! as String,
+        familyName: row['family_name']! as String,
+        variantName: row['variant_name']! as String,
+        aliases: aliases,
+      );
+    }
+    return entriesByVariant.values.toList();
+  }
+
   /// Meals of one type, ordered by name.
   ///
   /// The type lives on the family, not the variant, so this filters through

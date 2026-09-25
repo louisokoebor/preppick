@@ -28,7 +28,7 @@ class _ProposalTransport implements ImportHttpTransport {
           {
             'temp_id': 'family_rice',
             'preferred_name': 'Rice',
-            'aliases': [],
+            'aliases': ['rice with fish'],
             'variants': [
               {
                 'temp_id': 'variant_rice_fish',
@@ -95,6 +95,10 @@ void main() {
         ImportConfidenceBand.high,
       );
       expect(await MealService(database).getAllMealVariants(), isEmpty);
+      expect(
+        await database.database.then((db) => db.query('meal_components')),
+        isEmpty,
+      );
     },
   );
 
@@ -107,5 +111,44 @@ void main() {
     provider.assignMealType(candidate.id, MealType.dinner);
     expect(await provider.confirmImport(), 1);
     expect(await MealService(database).getAllMealVariants(), hasLength(1));
+    expect(
+      await database.database.then((db) => db.query('meal_components')),
+      hasLength(1),
+    );
+    expect(
+      await database.database.then((db) => db.query('variant_components')),
+      hasLength(1),
+    );
+    expect(
+      await database.database.then((db) => db.query('meal_aliases')),
+      hasLength(1),
+    );
+    final library = await MealService(database).getImportLibraryEntries();
+    expect(library.single.aliases, contains('rice with fish'));
+  });
+
+  test('an exact reviewed match reuses the existing variant', () async {
+    final meals = MealService(database);
+    final existing = await meals.addMeal(
+      familyName: 'Rice',
+      mealType: MealType.dinner,
+      variantName: 'Rice + Fish',
+    );
+    provider.updateSourceText('Rice and fish');
+    await provider.parseSource();
+    await provider.interpretWithAi([
+      ImportLibraryEntry(
+        id: existing.id,
+        familyId: existing.mealFamilyId,
+        familyName: 'Rice',
+        variantName: 'Rice + Fish',
+      ),
+    ]);
+
+    expect(provider.candidates.single.matchedExistingId, existing.id);
+    provider.assignMealType(provider.candidates.single.id, MealType.dinner);
+    expect(await provider.confirmImport(), 0);
+    expect(await meals.getAllMealVariants(), hasLength(1));
+    expect(provider.candidates.single.importedMealId, existing.id);
   });
 }

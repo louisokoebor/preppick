@@ -49,20 +49,7 @@ class ReviewImportScreen extends StatelessWidget {
     FocusManager.instance.primaryFocus?.unfocus();
     final provider = context.read<ImportProvider>();
     final mealProvider = context.read<MealProvider>();
-    final library = <ImportLibraryEntry>[];
-    for (final meal in mealProvider.meals) {
-      final family = mealProvider.familyOf(meal);
-      if (family == null) continue;
-      library.add(
-        ImportLibraryEntry(
-          id: meal.id,
-          familyId: meal.mealFamilyId,
-          familyName: family.name,
-          variantName: meal.name,
-          aliases: const [],
-        ),
-      );
-    }
+    final library = await mealProvider.getImportLibraryEntries();
     final ok = await provider.interpretWithAi(library);
     if (!context.mounted || !ok) return;
     ScaffoldMessenger.of(context).showSnackBar(

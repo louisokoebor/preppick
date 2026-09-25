@@ -79,6 +79,10 @@ class MealProvider extends ChangeNotifier {
   List<MealVariant> mealsOfType(MealType type) =>
       meals.where((meal) => typeOf(meal) == type).toList();
 
+  /// Loads the compact library index, including reviewed import aliases.
+  Future<List<ImportLibraryEntry>> getImportLibraryEntries() =>
+      _service.getImportLibraryEntries();
+
   /// Loads the library. Concurrent calls collapse into the one already
   /// running.
   Future<void> load() async {

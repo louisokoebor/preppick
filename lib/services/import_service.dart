@@ -5,7 +5,9 @@ import '../utils/id_utils.dart';
 import 'ai_import_client.dart';
 import 'database_service.dart';
 import 'import_line_classifier.dart';
+import 'import_matching_service.dart';
 import 'meal_service.dart';
+import 'package:sqflite/sqflite.dart';
 
 /// Conservative, local-only import logic for pasted meal history.
 ///
@@ -268,7 +270,19 @@ class ImportService {
   /// skipped so repeated confirmation cannot duplicate the same batch.
   Future<ImportConfirmationResult> confirmCandidates(
     List<ImportedMealCandidate> candidates,
-  ) async {
+  ) => _confirmCandidates(candidates);
+
+  Future<ImportConfirmationResult> confirmCandidatesWithProposal(
+    List<ImportedMealCandidate> candidates, {
+    ImportProposal? proposal,
+    List<ImportMatch> matches = const [],
+  }) => _confirmCandidates(candidates, proposal: proposal, matches: matches);
+
+  Future<ImportConfirmationResult> _confirmCandidates(
+    List<ImportedMealCandidate> candidates, {
+    ImportProposal? proposal,
+    List<ImportMatch> matches = const [],
+  }) async {
     final importedByKey = <String, String>{};
     final updated = <ImportedMealCandidate>[];
     var createdCount = 0;
@@ -287,12 +301,25 @@ class ImportService {
         continue;
       }
 
-      final meal = await _mealService.addMeal(
-        familyName: candidate.name,
-        mealType: type,
+      final context = proposal == null
+          ? null
+          : _proposalContextFor(candidate, proposal, matches);
+      final matchedMeal = await _resolveConfirmedMatch(
+        candidate,
+        type,
+        context,
       );
+      final meal =
+          matchedMeal ?? await _createConfirmedMeal(candidate, type, context);
+      if (matchedMeal == null) createdCount++;
       importedByKey[key] = meal.id;
-      createdCount++;
+      if (context != null) {
+        await _saveProposalMetadata(
+          meal: meal,
+          candidate: candidate,
+          context: context,
+        );
+      }
       updated.add(candidate.copyWith(importedMealId: meal.id));
     }
 
@@ -300,6 +327,184 @@ class ImportService {
       candidates: updated,
       createdCount: createdCount,
     );
+  }
+
+  Future<MealVariant?> _resolveConfirmedMatch(
+    ImportedMealCandidate candidate,
+    MealType type,
+    _ImportProposalContext? context,
+  ) async {
+    final proposedExistingId = candidate.matchedExistingId;
+    if (context != null &&
+        context.match.existingVariantId == proposedExistingId &&
+        context.match.kind != ImportMatchKind.noMatch &&
+        proposedExistingId != null) {
+      final existing = await _mealService.getMealVariant(proposedExistingId);
+      final family = existing == null
+          ? null
+          : await _mealService.getMealFamily(existing.mealFamilyId);
+      if (existing != null && family?.mealType == type) return existing;
+    }
+
+    final variants = await _mealService.getAllMealVariants();
+    final families = await _mealService.getAllMealFamilies();
+    final familyById = {for (final family in families) family.id: family};
+    for (final variant in variants) {
+      final family = familyById[variant.mealFamilyId];
+      if (family?.mealType == type &&
+          normaliseMealName(variant.name) ==
+              normaliseMealName(candidate.name)) {
+        return variant;
+      }
+    }
+    return null;
+  }
+
+  Future<MealVariant> _createConfirmedMeal(
+    ImportedMealCandidate candidate,
+    MealType type,
+    _ImportProposalContext? context,
+  ) async {
+    final variantName = context?.variant.displayName ?? candidate.name;
+    final familyName = context?.family.preferredName ?? candidate.name;
+    final existingFamilyId = context?.match.existingFamilyId;
+    if (context?.match.kind == ImportMatchKind.familyOnly &&
+        existingFamilyId != null) {
+      return _mealService.createMealVariant(
+        mealFamilyId: existingFamilyId,
+        name: variantName,
+      );
+    }
+    return _mealService.addMeal(
+      familyName: familyName,
+      mealType: type,
+      variantName: variantName,
+    );
+  }
+
+  _ImportProposalContext? _proposalContextFor(
+    ImportedMealCandidate candidate,
+    ImportProposal proposal,
+    List<ImportMatch> matches,
+  ) {
+    final matchByVariant = {
+      for (final match in matches) match.variantTempId: match,
+    };
+    for (final family in proposal.families) {
+      for (final variant in family.variants) {
+        if (variant.sourceLineIds.any(candidate.sourceLineIds.contains)) {
+          return _ImportProposalContext(
+            family: family,
+            variant: variant,
+            match:
+                matchByVariant[variant.tempId] ??
+                const ImportMatch(
+                  familyTempId: '',
+                  variantTempId: '',
+                  kind: ImportMatchKind.noMatch,
+                ),
+          );
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<void> _saveProposalMetadata({
+    required MealVariant meal,
+    required ImportedMealCandidate candidate,
+    required _ImportProposalContext context,
+  }) async {
+    final databaseService = _databaseService;
+    if (databaseService == null) return;
+    final db = await databaseService.database;
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    await db.transaction((txn) async {
+      for (final componentName in context.variant.componentNames) {
+        final trimmed = componentName.trim();
+        if (trimmed.isEmpty) continue;
+        final normalized = Ingredient.normaliseName(trimmed);
+        final rows = await txn.query(
+          'meal_components',
+          where: 'normalized_key = ?',
+          whereArgs: [normalized],
+          limit: 1,
+        );
+        final componentId = rows.isEmpty
+            ? PrepIds.newId()
+            : rows.single['id']! as String;
+        if (rows.isEmpty) {
+          await txn.insert('meal_components', {
+            'id': componentId,
+            'display_name': trimmed,
+            'normalized_key': normalized,
+            'notes': null,
+            'created_at': now,
+            'updated_at': now,
+          });
+        }
+        await txn.insert('variant_components', {
+          'variant_id': meal.id,
+          'component_id': componentId,
+          'role': null,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+
+      for (final alias in context.family.aliases) {
+        await _insertAlias(
+          txn,
+          rawLabel: alias,
+          familyId: meal.mealFamilyId,
+          source: 'ai_import',
+          now: now,
+        );
+      }
+      if (ImportMatchingService.normalizeLabel(candidate.originalText) !=
+          ImportMatchingService.normalizeLabel(context.variant.displayName)) {
+        await _insertAlias(
+          txn,
+          rawLabel: candidate.originalText,
+          variantId: meal.id,
+          source: 'import_source',
+          now: now,
+        );
+      }
+    });
+  }
+
+  Future<void> _insertAlias(
+    Transaction txn, {
+    required String rawLabel,
+    String? variantId,
+    String? familyId,
+    required String source,
+    required String now,
+  }) async {
+    final trimmed = rawLabel.trim();
+    if (trimmed.isEmpty) return;
+    final normalized = ImportMatchingService.normalizeLabel(trimmed);
+    final where = variantId != null
+        ? 'variant_id = ? AND normalized_label = ?'
+        : 'family_id = ? AND normalized_label = ?';
+    final id = variantId ?? familyId;
+    final existing = await txn.query(
+      'meal_aliases',
+      where: where,
+      whereArgs: [id, normalized],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) return;
+    await txn.insert('meal_aliases', {
+      'id': PrepIds.newId(),
+      'variant_id': variantId,
+      'family_id': familyId,
+      'raw_label': trimmed,
+      'normalized_label': normalized,
+      'source': source,
+      'created_at': now,
+      'updated_at': now,
+    });
   }
 
   static String normaliseMealName(String name) =>
@@ -383,6 +588,18 @@ class ImportService {
       reviewNote: row['review_note'] as String?,
     );
   }
+}
+
+class _ImportProposalContext {
+  const _ImportProposalContext({
+    required this.family,
+    required this.variant,
+    required this.match,
+  });
+
+  final ImportFamilyProposal family;
+  final ImportVariantProposal variant;
+  final ImportMatch match;
 }
 
 class StagedImport {
