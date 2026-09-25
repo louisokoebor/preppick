@@ -34,6 +34,49 @@ void main() {
     final result = service.parse('\n\nFried Rice\n   \nPaninis\n');
 
     expect(result.candidates.map((c) => c.name), ['Fried Rice', 'Paninis']);
+    expect(
+      result.sourceLines.where((line) => line.lineType == ImportLineType.blank),
+      hasLength(4),
+    );
+  });
+
+  test(
+    'obvious headings and non-meal lines are retained but not candidates',
+    () {
+      final result = service.parse(
+        'Breakfast\nLou Lou spag and fish\nDish soap\nAfrican Shop\neggs',
+      );
+
+      expect(result.candidates.map((candidate) => candidate.name), [
+        'Lou Lou spag and fish',
+      ]);
+      expect(
+        result.sourceLines.where(
+          (line) => line.lineType == ImportLineType.heading,
+        ),
+        hasLength(1),
+      );
+      expect(
+        result.sourceLines.where(
+          (line) => line.lineType == ImportLineType.householdItem,
+        ),
+        hasLength(2),
+      );
+      expect(
+        result.sourceLines.where(
+          (line) => line.lineType == ImportLineType.shoppingItem,
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test('uncertain rice and fish remains a review candidate', () {
+    final result = service.parse('rice and fish');
+
+    expect(result.candidates, hasLength(1));
+    expect(result.candidates.single.isAmbiguous, isTrue);
+    expect(result.candidates.single.name, 'rice and fish');
   });
 
   test('bullet symbols and numbering are stripped', () {
@@ -151,7 +194,7 @@ void main() {
       expect(restored!.batch.id, batch.id);
       expect(restored.batch.rawText, parsed.sourceText);
       expect(restored.sourceLines, hasLength(4));
-      expect(restored.candidates, hasLength(3));
+      expect(restored.candidates, hasLength(2));
       expect(
         restored.candidates.every((candidate) => candidate.batchId == batch.id),
         isTrue,

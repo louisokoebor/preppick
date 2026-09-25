@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../models/models.dart';
 import '../utils/id_utils.dart';
 import 'database_service.dart';
+import 'import_line_classifier.dart';
 import 'meal_service.dart';
 
 /// Conservative, local-only import logic for pasted meal history.
@@ -19,9 +20,6 @@ class ImportService {
 
   bool get supportsStaging => _databaseService != null;
 
-  static final RegExp _leadingBullet = RegExp(r'^\s*[-*•–—]\s+');
-  static final RegExp _leadingCheckbox = RegExp(r'^\s*\[[ xX]\]\s*');
-  static final RegExp _leadingNumber = RegExp(r'^\s*\d+[\).:-]\s+');
   static final RegExp _collapsedWhitespace = RegExp(r'\s+');
 
   ImportParseResult parse(String sourceText) {
@@ -32,17 +30,21 @@ class ImportService {
 
     for (var index = 0; index < rawLines.length; index++) {
       final rawLine = rawLines[index];
+      final classification = ImportLineClassifier.classify(rawLine);
       final sourceLine = ImportSourceLine(
         id: PrepIds.newId(),
         batchId: '',
         sequence: index + 1,
         originalText: rawLine,
+        lineType: classification.type,
+        heading: classification.heading,
+        classificationNote: classification.note,
       );
       sourceLines.add(sourceLine);
-      final original = rawLine.trim();
-      if (original.isEmpty) continue;
+      if (classification.type != ImportLineType.meal) continue;
 
-      final name = _cleanLine(original);
+      final original = rawLine.trim();
+      final name = ImportLineClassifier.cleanLine(original);
       if (name.isEmpty) continue;
 
       final key = normaliseMealName(name);
@@ -276,14 +278,6 @@ class ImportService {
   static String normaliseMealName(String name) =>
       name.trim().replaceAll(_collapsedWhitespace, ' ').toLowerCase();
 
-  static String _cleanLine(String line) {
-    var cleaned = line.trim();
-    cleaned = cleaned.replaceFirst(_leadingCheckbox, '');
-    cleaned = cleaned.replaceFirst(_leadingBullet, '');
-    cleaned = cleaned.replaceFirst(_leadingNumber, '');
-    return cleaned.trim();
-  }
-
   static bool _looksAmbiguous(String name) {
     final lower = name.toLowerCase();
     if (RegExp(
@@ -292,6 +286,9 @@ class ImportService {
       return true;
     }
     if (RegExp(r'^\d{1,2}[\/.-]\d{1,2}').hasMatch(lower)) return true;
+    if (RegExp(r'^rice\s+(?:and|with|\+)\s+fish$').hasMatch(lower)) {
+      return true;
+    }
     return false;
   }
 

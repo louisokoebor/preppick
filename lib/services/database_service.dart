@@ -36,7 +36,7 @@ class DatabaseService {
   static const String defaultDatabaseName = 'preppick.db';
 
   /// Bump this and add a migration in [_onUpgrade] for any schema change.
-  static const int schemaVersion = 4;
+  static const int schemaVersion = 5;
 
   final DatabaseFactory _factory;
   final String _databaseName;
@@ -90,6 +90,22 @@ class DatabaseService {
     if (oldVersion < 2) await _migrateWeeklyPlansUniqueWeek(db);
     if (oldVersion < 3) await _migratePlanAndMealTiming(db);
     if (oldVersion < 4) await _migrateImportStaging(db);
+    if (oldVersion < 5) await _migrateImportLineClassification(db);
+  }
+
+  Future<void> _migrateImportLineClassification(Database db) async {
+    await _addColumnIfMissing(
+      db,
+      'import_source_lines',
+      'line_type',
+      "TEXT NOT NULL DEFAULT 'meal'",
+    );
+    await _addColumnIfMissing(
+      db,
+      'import_source_lines',
+      'classification_note',
+      'TEXT',
+    );
   }
 
   Future<void> _migrateImportStaging(Database db) async {
@@ -421,9 +437,11 @@ class DatabaseService {
       batch_id TEXT NOT NULL,
       sequence INTEGER NOT NULL,
       original_text TEXT NOT NULL,
+      line_type TEXT NOT NULL DEFAULT 'meal',
       heading TEXT,
       inferred_slot TEXT,
       original_week TEXT,
+      classification_note TEXT,
       FOREIGN KEY (batch_id) REFERENCES import_batches (id)
         ON DELETE CASCADE,
       UNIQUE (batch_id, sequence)

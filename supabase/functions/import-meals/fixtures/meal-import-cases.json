@@ -1,0 +1,90 @@
+{
+  "valid": {
+    "source_line_ids": ["line_1", "line_2", "line_3", "line_4", "line_5"],
+    "proposal": {
+      "schema_version": "1",
+      "families": [
+        {
+          "temp_id": "family_lou_lou_spag",
+          "preferred_name": "Lou Lou Spag",
+          "aliases": ["Lou Lou spaghetti"],
+          "variants": [
+            {
+              "temp_id": "variant_lou_lou_fish",
+              "display_name": "Lou Lou Spag + Fish",
+              "component_names": ["Fish"],
+              "meal_slot": "dinner",
+              "source_line_ids": ["line_1", "line_2"],
+              "confidence_band": "high",
+              "needs_review_reason": null
+            }
+          ]
+        },
+        {
+          "temp_id": "family_rice",
+          "preferred_name": "Rice",
+          "aliases": [],
+          "variants": [
+            {
+              "temp_id": "variant_rice_yogurt_chicken",
+              "display_name": "Rice + Yogurt Chicken",
+              "component_names": ["Yogurt Chicken"],
+              "meal_slot": "dinner",
+              "source_line_ids": ["line_3"],
+              "confidence_band": "medium",
+              "needs_review_reason": null
+            }
+          ]
+        },
+        {
+          "temp_id": "family_jollof_rice",
+          "preferred_name": "Jollof Rice",
+          "aliases": [],
+          "variants": [
+            {
+              "temp_id": "variant_jollof_salmon",
+              "display_name": "Jollof Rice + Salmon",
+              "component_names": ["Salmon"],
+              "meal_slot": "dinner",
+              "source_line_ids": ["line_4"],
+              "confidence_band": "high",
+              "needs_review_reason": null
+            }
+          ]
+        }
+      ],
+      "unresolved": [
+        {
+          "source_line_ids": ["line_5"],
+          "original_text": "rice and fish",
+          "reason": "The type of rice and fish pairing is unspecified."
+        }
+      ]
+    }
+  },
+  "invalid_source_line": {
+    "source_line_ids": ["line_1"],
+    "proposal": {
+      "schema_version": "1",
+      "families": [
+        {
+          "temp_id": "family_rice",
+          "preferred_name": "Rice",
+          "aliases": [],
+          "variants": [
+            {
+              "temp_id": "variant_rice_fish",
+              "display_name": "Rice + Fish",
+              "component_names": ["Fish"],
+              "meal_slot": null,
+              "source_line_ids": ["line_missing"],
+              "confidence_band": "low",
+              "needs_review_reason": "Source evidence is incomplete."
+            }
+          ]
+        }
+      ],
+      "unresolved": []
+    }
+  }
+}
